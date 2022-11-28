@@ -1,13 +1,4 @@
-function GetContext(){
-    var canvas = document.createElement('canvas');
-    document.body.appendChild(canvas);
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    document.body.style.border = '0';
-    document.body.style.margin = '0';
-    document.body.style.overflow = 'hidden';
-    return canvas.getContext('2d');
-}
+
 
 var code = `
 
@@ -34,6 +25,87 @@ Components{
 }
 
 Library{
+    RemoveFromArray(array, item){
+        const index = array.indexOf(item);
+        if (index > -1)
+            array.splice(index, 1);
+    }
+
+    CreateButton(parent, name, onclick){
+        var button = document.createElement('button');
+        parent.appendChild(button);
+        button.innerHTML = name;
+        button.onclick = onclick
+        return button;
+    }
+
+    CreateDivButton(parent, name, onclick){
+        var div = CreateDiv(parent);
+        var button = CreateButton(div, name, onclick);
+        return button;
+    }
+
+    CreateDiv(parent){
+        var div = document.createElement('div');
+        parent.appendChild(div);
+        return div;
+    }
+
+    GetContext(parent){
+        var div= CreateDiv(parent);
+        var canvas = document.createElement('canvas');
+        div.appendChild(canvas)
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        parent.style.border = '0';
+        parent.style.margin = '0';
+        parent.style.overflow = 'hidden';
+        return canvas.getContext('2d');
+    }
+
+    CreateMenuItemButton(div, name, onclick){
+        CreateDivButton(div, name, ()=>{
+            onclick();
+            document.body.removeChild(div);
+        });
+    }
+
+    CreateMenu(position, menuItems){
+        var div = CreateDiv(document.body);
+        div.style.position = 'absolute';
+        div.style.left = position.x+'px';
+        div.style.top = position.y+'px';
+        for(var i of menuItems){
+            CreateMenuItemButton(div, i.name, i.onclick);
+        }
+    }
+
+    FindPos(obj){
+        var curleft = 0;
+        var curtop = 0;
+     
+        if (obj.offsetParent) {
+           do {
+              curleft += obj.offsetLeft;
+              curtop += obj.offsetTop;
+           } while (obj = obj.offsetParent);
+     
+           return Vector2(curleft, curtop);
+        }
+    }
+
+    MenuItem(name, onclick){
+        return {name:name, onclick:onclick};
+    }
+
+    CreateMenuButton(parent, name, menuItems){
+        var button = CreateButton(parent, name, ()=>{
+            var pos = FindPos(button);
+            pos.y += button.offsetHeight;
+            CreateMenu(pos, menuItems);
+        });
+    }
+
     LoadFile(func) {
         readFile = function(e) {
             var file = e.target.files[0];
@@ -92,11 +164,21 @@ Library{
     }
 
     Clear(r,g,b){
+        var ctx=base.ctx;
         ctx.fillStyle = Color(r,g,b);
         ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
     }
 
+    RectCollision(posA, scaleA, posB, scaleB){
+        var distx = Math.abs(posB.x - posA.x);
+        var disty = Math.abs(posB.y - posA.y);
+        var minx = (scaleA.x + scaleB.x)/2;
+        var miny = (scaleA.y + scaleB.y)/2;
+        return distx<minx && disty<miny;
+    }
+
     DrawRects(){
+        var ctx = base.ctx;
         for(var e of entities){
             if(e.Rect!=undefined){
                 var pos = e.Transform2D.position;
@@ -107,11 +189,12 @@ Library{
         }
     }
 
-    OnMouseDown(e){
-        base.mouseDown = true;
-        base.startDrag = Vector2(e.clientX, e.clientY);
-        CallModeFunction(base, 'OnMouseDown', [e]);
-        CallModeFunction(base, 'OnBeginDrag', [base.startDrag]);
+    CreateRect(){
+        CallModeFunction(base, 'CreateRect', []);
+    }
+
+    CreatePlayer(){
+        CallModeFunction(base, 'CreatePlayer', []);
     }
 
     GetEntityWithComponent(type){
@@ -122,13 +205,29 @@ Library{
         return undefined;
     }
 
+    GetMousePos(canvas, e) {
+        var rect = canvas.getBoundingClientRect();
+        return Vector2(e.clientX - rect.left, e.clientY - rect.top);
+    }
+    
+    OnMouseDown(e){
+        base.mouseDown = true;
+        var mousePos = GetMousePos(base.ctx.canvas, e);
+        base.startDrag = mousePos;
+        CallModeFunction(base, 'OnMouseDown', [mousePos]);
+        CallModeFunction(base, 'OnBeginDrag', [mousePos]);
+    }
+
     OnMouseUp(e){   
-        base.mouseDown = false;     
+        base.mouseDown = false; 
+        var mousePos = GetMousePos(base.ctx.canvas, e);
+        CallModeFunction(base, 'OnEndDrag', [mousePos]);    
     }
 
     OnMouseMove(e){
         if(base.mouseDown){
-            CallModeFunction(base, 'OnDrag', [base.startDrag, Vector2(e.clientX, e.clientY)]);
+            var mousePos = GetMousePos(base.ctx.canvas, e);
+            CallModeFunction(base, 'OnDrag', [base.startDrag, mousePos]);
         }        
     }
 
@@ -151,7 +250,33 @@ Library{
         requestAnimationFrame(Update);
     }
 
+    RunButton(){
+        if(base.mode == 'Editor'){
+            base.runButton.innerHTML = 'x';
+            base.mode = 'Game';
+            base.saveData = JSON.stringify(entities);
+        }
+        else{
+            base.runButton.innerHTML = '>';
+            base.mode = 'Editor';
+            entities = JSON.parse(base.saveData);
+        }
+    }
+
+    Save(){
+        SaveFile('jtsave.txt', JSON.stringify(entities));
+    }
+
+    Load(){
+        LoadFile(c=>{entities = JSON.parse(c);});
+    }
+
     Awake(){
+        base.menu = CreateDiv(document.body);
+        CreateMenuButton(base.menu, 'File', [MenuItem('Load',Load), MenuItem('Save',Save)])
+        CreateMenuButton(base.menu, 'Add', [MenuItem('Rect', CreateRect), MenuItem('Player', CreatePlayer)]);
+        base.runButton = CreateButton(base.menu, '>', RunButton);
+        base.ctx = GetContext(document.body);
         addEventListener('keydown', OnKeyDown);
         addEventListener('keyup', OnKeyUp);
         addEventListener('mousedown', OnMouseDown);
@@ -172,91 +297,155 @@ Library{
 }
 
 mode Editor{
-    mode CreateRects{
-        OnBeginDrag(pos){
-            CreateRects.current = Entity([
-                Transform2D(pos, 0, Vector2(0,0)),
-                Rect(Color(0,0,1)),
-                RectCollider(),
-            ]);
-        }
-    
-        OnDrag(start, end){
-            var center = Vector2((start.x+end.x)/2, (start.y+end.y)/2);
-            var scale = Vector2(Math.abs(end.x-start.x), Math.abs(end.y-start.y));
-            CreateRects.current.Transform2D.position = center;
-            CreateRects.current.Transform2D.scale = scale;
-        }
-
-        OnKeyDown(e){
-            if(e.key == 'Tab'){
-                Editor.mode = 'CreatePlayer';
-                e.preventDefault();
-            }
-        }
-    }
-
-    mode CreatePlayer{
-        OnMouseDown(e){
-            Entity([
-                Transform2D(Vector2(e.clientX, e.clientY), 0, Vector2(30,80)),
-                Rect(Color(1,0,0)),
-                Player(5,10,0.2,0,false),
-            ]);
-        }
-
-        OnKeyDown(e){
-            if(e.key == 'Tab'){
-                Editor.mode = 'CreateRects';
-                e.preventDefault();
-            }
-        }
-    }
-
     Awake(){
-        Editor.mode = 'CreateRects';
+        Editor.selected = [];
+    }
+
+    Duplicate(){
+        var selected = [];
+        for(var e of Editor.selected){
+            var newEntity = JSON.parse(JSON.stringify(e));
+            entities.push(newEntity);
+            selected.push(newEntity);
+        }
+        Editor.selected = selected;
+    }
+
+    Delete(){
+        for(var e of Editor.selected){
+            RemoveFromArray(entities, e);
+        }
+        Editor.selected = [];
+    }
+
+    CreatePlayer(){
+        var e = Entity([
+            Transform2D(Vector2(base.ctx.canvas.width/2, base.ctx.canvas.height/2), 0, Vector2(30,70)),
+            Rect(Color(1,0,0)),
+            Player(5,10,0.2,0,false),
+        ]);
+        Editor.selected = [e];
+    }
+
+    CreateRect(){
+        var e = Entity([
+            Transform2D(Vector2(base.ctx.canvas.width/2, base.ctx.canvas.height/2), 0, Vector2(100,100)),
+            Rect(Color(0,0,1)),
+            RectCollider(),
+        ]);
+        Editor.selected = [e];
+    }
+
+    DrawHandle(transform, dirX, dirY, radius){
+        var x = transform.position.x - transform.scale.x/2*dirX;
+        var y = transform.position.y - transform.scale.y/2*dirY;
+        var ctx = base.ctx;
+        ctx.fillStyle = Color(1,0.5,0);
+        if(Editor.selectedHandle!=undefined && Editor.selectedHandle.transform == transform && Editor.selectedHandle.dirX == dirX && Editor.selectedHandle.dirY == dirY)
+            ctx.fillStyle = 'blue';
+        ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
+        ctx.strokeStyle = Color(1,0.5,0);
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x-radius, y-radius, radius*2, radius*2);
+    }
+
+    DrawSelected(){
+        var ctx = base.ctx;
+        for(var e of Editor.selected){
+            ctx.strokeStyle = Color(1,0.5,0);
+            ctx.lineWidth = 2;
+            var pos = e.Transform2D.position;
+            var scale = e.Transform2D.scale;
+            ctx.strokeRect(pos.x - scale.x/2, pos.y - scale.y/2, scale.x, scale.y);
+            DrawHandle(e.Transform2D, -1, -1, 6);
+            DrawHandle(e.Transform2D, 1, -1, 6);
+            DrawHandle(e.Transform2D, 1, 1, 6);
+            DrawHandle(e.Transform2D, -1, 1, 6);
+        }
+    }
+
+    SelectHandle(pos, transform, dirX, dirY, radius){
+        var x = transform.position.x - transform.scale.x/2*dirX;
+        var y = transform.position.y - transform.scale.y/2*dirY;
+        if(RectCollision(Vector2(x,y), Vector2(radius*2, radius*2), pos, Vector2(0,0)))
+            Editor.selectedHandle = {transform:transform, dirX:dirX, dirY:dirY, transformScale:transform.scale, transformPosition:transform.position}
+    }
+
+    IsOver(pos){
+        for(var e of Editor.selected){
+            if(RectCollision(e.Transform2D.position, e.Transform2D.scale, pos, Vector2(0,0)))
+                return true;
+        }
+        return false;
+    }
+
+    OnBeginDrag(pos){
+        for(var e of Editor.selected){
+            SelectHandle(pos, e.Transform2D, -1, -1, 6);
+            SelectHandle(pos, e.Transform2D, 1, -1, 6);
+            SelectHandle(pos, e.Transform2D, 1, 1, 6);
+            SelectHandle(pos, e.Transform2D, -1, 1, 6);
+        }
+        if(Editor.selectedHandle==undefined){
+            Editor.translate = {lastPos:pos};
+            if(IsOver(pos)){
+                return;
+            }
+            Editor.selected = [];
+            for(var i=entities.length-1;i>=0;i--){
+                var e = entities[i];
+                if(RectCollision(e.Transform2D.position, e.Transform2D.scale, pos, Vector2(0,0))){
+                    Editor.selected.push(e);
+                }
+            }
+        }
+    }
+
+    OnDrag(start, pos){
+        if(Editor.selectedHandle!=undefined){
+            var s = Editor.selectedHandle.transformScale;
+            var p = Editor.selectedHandle.transformPosition;
+            var dirX = Editor.selectedHandle.dirX;
+            var dirY = Editor.selectedHandle.dirY;
+            var x = p.x + s.x/2*dirX;
+            var y = p.y + s.y/2*dirY;
+            var centerX = (x+pos.x)/2;
+            var centerY = (y+pos.y)/2;
+            var scaleX = Math.abs(pos.x - x);
+            var scaleY = Math.abs(pos.y - y);
+            Editor.selectedHandle.transform.position = Vector2(centerX, centerY);
+            Editor.selectedHandle.transform.scale = Vector2(scaleX, scaleY);
+        }
+        if(Editor.translate!=undefined){
+            var deltaX = pos.x - Editor.translate.lastPos.x;
+            var deltaY = pos.y - Editor.translate.lastPos.y;
+            for(var e of Editor.selected){
+                e.Transform2D.position = Vector2(e.Transform2D.position.x+deltaX, e.Transform2D.position.y+deltaY);
+            }
+            Editor.translate.lastPos = pos;
+        }
+    }
+
+    OnEndDrag(pos){
+        Editor.selectedHandle = undefined;
+        Editor.translate = undefined;
+    }
+
+    OnKeyDown(e){
+        if(e.key == 'd')
+            Duplicate();
+        if(e.key == 'Backspace')
+            Delete();
     }
 
     Update(){
         Clear(0,0,0);
         DrawRects();
-    }
-
-    OnMouseDown(e){
-        CallModeFunction(Editor, 'OnMouseDown', [e]);
-    }
-
-    OnBeginDrag(pos){
-        CallModeFunction(Editor, 'OnBeginDrag', [pos]);
-    }
-
-    OnDrag(start, end){
-        CallModeFunction(Editor, 'OnDrag', [start, end]);
-    }
-
-    OnKeyDown(e){
-        CallModeFunction(Editor, 'OnKeyDown', [e]);
-        if(e.key == 'Escape'){
-            base.mode = 'Game';
-            base.saveData = JSON.stringify(entities);
-        }
-        if(e.key == 's')
-            SaveFile('jtsave.txt', JSON.stringify(entities));
-        if(e.key == 'l')
-            LoadFile(c=>{entities = JSON.parse(c);});
+        DrawSelected();
     }
 }
 
 mode Game{
-
-    RectCollision(posA, scaleA, posB, scaleB){
-        var distx = Math.abs(posB.x - posA.x);
-        var disty = Math.abs(posB.y - posA.y);
-        var minx = (scaleA.x + scaleB.x)/2;
-        var miny = (scaleA.y + scaleB.y)/2;
-        return distx<minx && disty<miny;
-    }
-
     Move(transform, deltaX, deltaY){
         var pos = Vector2(transform.position.x+deltaX, transform.position.y+deltaY);
         for(var e of entities){
@@ -286,22 +475,17 @@ mode Game{
             player.Player.velocityY-=player.Player.jumpSpeed;
             player.Player.grounded=false;
         }
-        if(player.Player.grounded)
+        player.Player.grounded=false;
+        if(Move(player.Transform2D, 0, player.Player.velocityY) && player.Player.velocityY>0){
+            player.Player.grounded=true;
             player.Player.velocityY=0;
-        player.Player.grounded = Move(player.Transform2D, 0, player.Player.velocityY);
+        }
     }
 
     Update(){
         Clear(0,0,0);
         PlayerMove();
         DrawRects();
-    }
-
-    OnKeyDown(e){
-        if(e.key == 'Escape'){
-            base.mode = 'Editor';
-            entities = JSON.parse(base.saveData);
-        }
     }
 }
 `;
@@ -372,9 +556,8 @@ function JSTokenizer(code){
     else{
         var emittedCode = Emit(p);
         console.log(emittedCode);
-        new Function('ctx', emittedCode)(ctx);
+        new Function(emittedCode)();
     }
 }
 
-var ctx = GetContext();
 JSTokenizer(code);
