@@ -8,7 +8,7 @@ function Emit(parsed){
         code+='function '+f.name.value+'(';
         for(var i=0;i<f.args.length;i++){
             code+=f.args[i].value;
-            if(i<f.args.length)
+            if(i<f.args.length-1)
                 code+=',';
         }
         code+=')\n';
@@ -18,10 +18,8 @@ function Emit(parsed){
 
     var code = '';
     code+=`
-var modes = [];
-var g = {};
+var base = {};
 var entities = [];
-var mode=0;
 `;
     for(var f of library)
         Function(f);
@@ -43,41 +41,33 @@ var mode=0;
     }
 
     function Mode(mode){
-        code+='function '+mode.name.value+'(){\n'
-        for(var f of mode.body){
-            Function(f);
+        var modeName = mode.name.value;
+        code+='function '+modeName+'(){\n'
+        code+='var '+modeName+'={};\n';
+        for(var b of mode.body){
+            if(b.constructorName == 'Function')
+                Function(b);
+            else if(b.constructorName == 'Mode')
+                Mode(b);
         }
-        code+='return {\n';
-        for(var f of mode.body){
-            code+=f.name.value+':'+f.name.value+',\n';
+        for(var b of mode.body){
+            if(b.constructorName == 'Function')
+                code+=modeName+'.'+b.name.value+'='+b.name.value+';\n';
+            else if(b.constructorName == 'Mode')
+                code+=modeName+'.'+b.name.value+'='+b.name.value+'();\n';
         }
-        code+='};\n';
+        var awakeFunc = mode.body.find(b=>b.constructorName == 'Function' && b.name.value == 'Awake');
+        if(awakeFunc!=undefined)
+            code+='Awake();\n';
+        code+='return '+modeName+';\n';
         code+='}\n';
     }
     for(var mode of modes){
         Mode(mode);
-        code+='modes.push('+mode.name.value+'());\n';
+        code+='base.'+mode.name.value+'='+mode.name.value+'();\n';
     }
     code+=`
-function KeyDown(e){
-    if(e.key == 'Escape'){
-        mode++;
-        if(mode>=modes.length)
-            mode=0;
-        if(modes[mode].Awake!=undefined)
-            modes[mode].Awake();
-    }
-}
-
-function Update(){
-    if(modes[mode].Update!=undefined)
-        modes[mode].Update();
-    requestAnimationFrame(Update);
-}
-addEventListener('keydown', KeyDown);
-if(modes[mode].Awake!=undefined)
-    modes[mode].Awake();
-Update();
+Awake();
 `;
     return code;
 }

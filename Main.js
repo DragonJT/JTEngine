@@ -18,15 +18,11 @@ Components{
         scale = Vector2(20,20);
     }
 
-    Rigidbody2D{
-        velocity = Vector2(0,0);
-    }
-
     Rect{
         color = Color(0,0,1);
     }
 
-    StayOnScreen{}
+    Player{}
 }
 
 Library{
@@ -44,17 +40,7 @@ Library{
             entity[c.constructorName] = c;
         }
         entities.push(entity);
-    }
-
-    CreateRocks(count, size){
-        for(var i=0;i<count;i++){
-            Entity([
-                Transform2D(Vector2(Math.random()*ctx.canvas.width, Math.random()*ctx.canvas.height), 0, Vector2(Math.random()*size-size/2, Math.random()*size-size/2)),
-                Rigidbody2D(Vector2(Math.random()*2-1, Math.random()*2-1)),
-                Rect(Color(Math.random(), Math.random(), Math.random())),
-                StayOnScreen(),
-            ]);
-        }
+        return entity;
     }
 
     Clear(r,g,b){
@@ -72,51 +58,128 @@ Library{
             }
         }
     }
+
+    MouseDown(e){
+        base.mouseDown = true;
+        base.startDrag = Vector2(e.clientX, e.clientY);
+        CallModeFunction(base, 'MouseDown', [e]);
+        CallModeFunction(base, 'BeginDrag', [base.startDrag]);
+    }
+
+    MouseUp(e){   
+        base.mouseDown = false;     
+    }
+
+    MouseMove(e){
+        if(base.mouseDown){
+            CallModeFunction(base, 'Drag', [base.startDrag, Vector2(e.clientX, e.clientY)]);
+        }        
+    }
+
+    KeyDown(e){
+        CallModeFunction(base, 'KeyDown', [e]);
+    }
+
+    Update(){
+        base[base.mode].Update();
+        requestAnimationFrame(Update);
+    }
+
+    Awake(){
+        addEventListener('keydown', KeyDown);
+        addEventListener('mousedown', MouseDown);
+        addEventListener('mousemove', MouseMove);
+        addEventListener('mouseup', MouseUp);
+
+        base.mode = 'Editor';
+        Update();
+    }
+
+    CallModeFunction(obj, funcName, params){
+        var func = obj[obj.mode][funcName];
+        if(func!=undefined)
+            func(...params);
+    }
 }
 
 mode Editor{
+    mode CreateRects{
+        BeginDrag(pos){
+            CreateRects.current = Entity([
+                Transform2D(pos, 0, Vector2(0,0)),
+                Rect(Color(0,0,1)),
+            ]);
+        }
+    
+        Drag(start, end){
+            var center = Vector2((start.x+end.x)/2, (start.y+end.y)/2);
+            var scale = Vector2(end.x-start.x, end.y-start.y);
+            CreateRects.current.Transform2D.position = center;
+            CreateRects.current.Transform2D.scale = scale;
+        }
+
+        KeyDown(e){
+            if(e.key == 'Tab'){
+                Editor.mode = 'CreatePlayer';
+                e.preventDefault();
+            }
+        }
+    }
+
+    mode CreatePlayer{
+        MouseDown(e){
+            Entity([
+                Transform2D(Vector2(e.clientX, e.clientY), 0, Vector2(30,80)),
+                Rect(Color(1,0,0)),
+                Player(),
+            ]);
+        }
+
+        KeyDown(e){
+            if(e.key == 'Tab'){
+                Editor.mode = 'CreateRects';
+                e.preventDefault();
+            }
+        }
+    }
+
     Awake(){
-        CreateRocks(50, 100);
+        Editor.mode = 'CreateRects';
     }
 
     Update(){
         Clear(0,0,0);
         DrawRects();
     }
+
+    MouseDown(e){
+        CallModeFunction(Editor, 'MouseDown', [e]);
+    }
+
+    BeginDrag(pos){
+        CallModeFunction(Editor, 'BeginDrag', [pos]);
+    }
+
+    Drag(start, end){
+        CallModeFunction(Editor, 'Drag', [start, end]);
+    }
+
+    KeyDown(e){
+        CallModeFunction(Editor, 'KeyDown', [e]);
+        if(e.key == 'Escape')
+            base.mode = 'Game';
+    }
 }
 
 mode Game{
-    Rigidbody2D(){
-        for(var e of entities){
-            if(e.Rigidbody2D!=undefined){
-                var pos = e.Transform2D.position;
-                pos.x += e.Rigidbody2D.velocity.x;
-                pos.y += e.Rigidbody2D.velocity.y;
-            }
-        }
-    }
-
-    StayOnScreen(){
-        for(var e of entities){
-            if(e.StayOnScreen!=undefined){
-                var pos = e.Transform2D.position;
-                if(pos.x<0)
-                    pos.x+=ctx.canvas.width;
-                if(pos.x>ctx.canvas.width)
-                    pos.x-=ctx.canvas.width;
-                if(pos.y<0)
-                    pos.y+=ctx.canvas.height;
-                if(pos.y>ctx.canvas.height)
-                    pos.y-=ctx.canvas.height;
-            }
-        }
-    }
-
     Update(){
-        Clear(0,0,0.5);
-        Rigidbody2D();
-        StayOnScreen();
+        Clear(0,0,0);
         DrawRects();
+    }
+
+    KeyDown(e){
+        if(e.key == 'Escape')
+            base.mode = 'Editor';
     }
 }
 `;
@@ -170,7 +233,7 @@ function JSTokenizer(code){
     var mode = new PsObject('Mode');
     mode.AddLiteral('mode');
     mode.Add('name', new PsToken('Identifier'));
-    mode.Add('body', new PsDecoratedValue([new PsToken('{'), new PsWhile(func, 0), new PsToken('}')], 1));
+    mode.Add('body', new PsDecoratedValue([new PsToken('{'), new PsWhile(new PsOr([mode, func]), 0), new PsToken('}')], 1));
 
     var core = new PsWhile(new PsOr([library, components, mode]), 0);
     var compileUnit = core;
