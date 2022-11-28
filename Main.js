@@ -22,10 +22,58 @@ Components{
         color = Color(0,0,1);
     }
 
-    Player{}
+    Player{
+        moveSpeed = 5;
+        jumpSpeed = 10;
+        gravity = 0.2;
+        velocityY = 0;
+        grounded=false;
+    }
+
+    RectCollider{}
 }
 
 Library{
+    LoadFile(func) {
+        readFile = function(e) {
+            var file = e.target.files[0];
+            if (!file) {
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var contents = e.target.result;
+                fileInput.func(contents)
+                document.body.removeChild(fileInput)
+            }
+            reader.readAsText(file)
+        }
+        var fileInput = document.createElement("input")
+        fileInput.type='file'
+        fileInput.style.display='none'
+        fileInput.onchange=readFile
+        fileInput.func=func
+        document.body.appendChild(fileInput)
+        fileInput.click();
+    }
+
+    SaveFile(name, data){
+        const file = new File([data], name, {
+            type: 'text/plain',
+        });
+          
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(file);
+        
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    }
+    
     Color(r,g,b){
         return 'rgb('+r*255+','+g*255+','+b*255+')';
     }
@@ -59,38 +107,59 @@ Library{
         }
     }
 
-    MouseDown(e){
+    OnMouseDown(e){
         base.mouseDown = true;
         base.startDrag = Vector2(e.clientX, e.clientY);
-        CallModeFunction(base, 'MouseDown', [e]);
-        CallModeFunction(base, 'BeginDrag', [base.startDrag]);
+        CallModeFunction(base, 'OnMouseDown', [e]);
+        CallModeFunction(base, 'OnBeginDrag', [base.startDrag]);
     }
 
-    MouseUp(e){   
+    GetEntityWithComponent(type){
+        for(var e of entities){
+            if(e[type]!=undefined)
+                return e;
+        }
+        return undefined;
+    }
+
+    OnMouseUp(e){   
         base.mouseDown = false;     
     }
 
-    MouseMove(e){
+    OnMouseMove(e){
         if(base.mouseDown){
-            CallModeFunction(base, 'Drag', [base.startDrag, Vector2(e.clientX, e.clientY)]);
+            CallModeFunction(base, 'OnDrag', [base.startDrag, Vector2(e.clientX, e.clientY)]);
         }        
     }
 
-    KeyDown(e){
-        CallModeFunction(base, 'KeyDown', [e]);
+    GetKey(key){
+        return base.input.keys.has(key);
+    }
+
+    OnKeyDown(e){
+        base.input.keys.add(e.key);
+        CallModeFunction(base, 'OnKeyDown', [e]);
+    }
+
+    OnKeyUp(e){
+        CallModeFunction(base, 'OnKeyUp', [e]);
+        base.input.keys.delete(e.key);
     }
 
     Update(){
-        base[base.mode].Update();
+        CallModeFunction(base, 'Update', []);
         requestAnimationFrame(Update);
     }
 
     Awake(){
-        addEventListener('keydown', KeyDown);
-        addEventListener('mousedown', MouseDown);
-        addEventListener('mousemove', MouseMove);
-        addEventListener('mouseup', MouseUp);
+        addEventListener('keydown', OnKeyDown);
+        addEventListener('keyup', OnKeyUp);
+        addEventListener('mousedown', OnMouseDown);
+        addEventListener('mousemove', OnMouseMove);
+        addEventListener('mouseup', OnMouseUp);
 
+        base.input = {};
+        base.input.keys = new Set();
         base.mode = 'Editor';
         Update();
     }
@@ -104,21 +173,22 @@ Library{
 
 mode Editor{
     mode CreateRects{
-        BeginDrag(pos){
+        OnBeginDrag(pos){
             CreateRects.current = Entity([
                 Transform2D(pos, 0, Vector2(0,0)),
                 Rect(Color(0,0,1)),
+                RectCollider(),
             ]);
         }
     
-        Drag(start, end){
+        OnDrag(start, end){
             var center = Vector2((start.x+end.x)/2, (start.y+end.y)/2);
-            var scale = Vector2(end.x-start.x, end.y-start.y);
+            var scale = Vector2(Math.abs(end.x-start.x), Math.abs(end.y-start.y));
             CreateRects.current.Transform2D.position = center;
             CreateRects.current.Transform2D.scale = scale;
         }
 
-        KeyDown(e){
+        OnKeyDown(e){
             if(e.key == 'Tab'){
                 Editor.mode = 'CreatePlayer';
                 e.preventDefault();
@@ -127,15 +197,15 @@ mode Editor{
     }
 
     mode CreatePlayer{
-        MouseDown(e){
+        OnMouseDown(e){
             Entity([
                 Transform2D(Vector2(e.clientX, e.clientY), 0, Vector2(30,80)),
                 Rect(Color(1,0,0)),
-                Player(),
+                Player(5,10,0.2,0,false),
             ]);
         }
 
-        KeyDown(e){
+        OnKeyDown(e){
             if(e.key == 'Tab'){
                 Editor.mode = 'CreateRects';
                 e.preventDefault();
@@ -152,34 +222,86 @@ mode Editor{
         DrawRects();
     }
 
-    MouseDown(e){
-        CallModeFunction(Editor, 'MouseDown', [e]);
+    OnMouseDown(e){
+        CallModeFunction(Editor, 'OnMouseDown', [e]);
     }
 
-    BeginDrag(pos){
-        CallModeFunction(Editor, 'BeginDrag', [pos]);
+    OnBeginDrag(pos){
+        CallModeFunction(Editor, 'OnBeginDrag', [pos]);
     }
 
-    Drag(start, end){
-        CallModeFunction(Editor, 'Drag', [start, end]);
+    OnDrag(start, end){
+        CallModeFunction(Editor, 'OnDrag', [start, end]);
     }
 
-    KeyDown(e){
-        CallModeFunction(Editor, 'KeyDown', [e]);
-        if(e.key == 'Escape')
+    OnKeyDown(e){
+        CallModeFunction(Editor, 'OnKeyDown', [e]);
+        if(e.key == 'Escape'){
             base.mode = 'Game';
+            base.saveData = JSON.stringify(entities);
+        }
+        if(e.key == 's')
+            SaveFile('jtsave.txt', JSON.stringify(entities));
+        if(e.key == 'l')
+            LoadFile(c=>{entities = JSON.parse(c);});
     }
 }
 
 mode Game{
+
+    RectCollision(posA, scaleA, posB, scaleB){
+        var distx = Math.abs(posB.x - posA.x);
+        var disty = Math.abs(posB.y - posA.y);
+        var minx = (scaleA.x + scaleB.x)/2;
+        var miny = (scaleA.y + scaleB.y)/2;
+        return distx<minx && disty<miny;
+    }
+
+    Move(transform, deltaX, deltaY){
+        var pos = Vector2(transform.position.x+deltaX, transform.position.y+deltaY);
+        for(var e of entities){
+            if(e.RectCollider!=undefined){
+                if(RectCollision(pos, transform.scale, e.Transform2D.position, e.Transform2D.scale)){
+                    return true;
+                }
+            }
+        }
+        transform.position = pos;
+        return false;
+    }
+
+    PlayerMove(){
+        var player = GetEntityWithComponent('Player');
+        if(player==undefined)
+            return;
+        var moveX = 0;
+        if(GetKey('ArrowRight'))
+            moveX+=player.Player.moveSpeed;
+        if(GetKey('ArrowLeft'))
+            moveX-=player.Player.moveSpeed;
+        Move(player.Transform2D, moveX, 0);
+
+        player.Player.velocityY+=player.Player.gravity;
+        if(GetKey('ArrowUp') && player.Player.grounded){
+            player.Player.velocityY-=player.Player.jumpSpeed;
+            player.Player.grounded=false;
+        }
+        if(player.Player.grounded)
+            player.Player.velocityY=0;
+        player.Player.grounded = Move(player.Transform2D, 0, player.Player.velocityY);
+    }
+
     Update(){
         Clear(0,0,0);
+        PlayerMove();
         DrawRects();
     }
 
-    KeyDown(e){
-        if(e.key == 'Escape')
+    OnKeyDown(e){
+        if(e.key == 'Escape'){
             base.mode = 'Editor';
+            entities = JSON.parse(base.saveData);
+        }
     }
 }
 `;
@@ -191,12 +313,12 @@ function JSTokenizer(code){
     var alphaNumeric = new TkOr([character, digit]);
     var integer = new TkWhile(digit, 1);
     var float = new TkObject([new TkWhile(digit, 1), new TkString('.'), new TkWhile(digit, 0)]);
-    tokenizer.AddLiterals(['<=','>=','!=','+','-','*','/','(',')','=',';','.','{','}','(',')',',','<','>','[',']','!',':']);
+    tokenizer.AddLiterals(['==','&&','||','<=','>=','!=','+','-','*','/','(',')','=',';','.','{','}','(',')',',','<','>','[',']','!',':']);
     tokenizer.Add('Whitespace', new TkOr([new TkString(' '), new TkString('\n'), new TkString('\t'), new TkString('\r')]), false);
     tokenizer.Add('Number', new TkOr([float, integer]));
     tokenizer.Add('String', new TkOr([new TkQuote('"'), new TkQuote("'"), new TkQuote('`')]));
     tokenizer.Add('Identifier', new TkObject([character, new TkWhile(alphaNumeric, 0)]), true, 
-        new Set(['Components', 'StartupSystems', 'Systems', 'Library', 'mode']));
+        new Set(['Components', 'StartupSystems', 'Systems', 'Library', 'mode', 'true', 'false']));
     var tokens = tokenizer.Tokenize(code);
 
     var value = new PsCircular();
@@ -204,7 +326,8 @@ function JSTokenizer(code){
     call.Add('name', new PsToken('Identifier'));
     call.Add('params', new PsDecoratedValue([new PsToken('('), new PsWhileWithDeliminator(value, ','), new PsToken(')')], 1));
 
-    value.parser = new PsOr([call, new PsToken('Number')]);
+    var bool = new PsOr([new PsToken('true'), new PsToken('false')]);
+    value.parser = new PsOr([call, new PsToken('Number'), bool]);
 
     var field = new PsObject('Field');
     field.Add('name', new PsToken('Identifier'));
