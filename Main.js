@@ -38,13 +38,13 @@ component Transform2D{
     SelectHandle(pos, transform, dirX, dirY, radius){
         var x = transform.position.x - transform.scale.x/2*dirX;
         var y = transform.position.y - transform.scale.y/2*dirY;
-        if(RectCollision(Vector2(x,y), Vector2(radius*2, radius*2), pos, Vector2(0,0)))
+        if(Library.RectCollision(Vector2(x,y), Vector2(radius*2, radius*2), pos, Vector2(0,0)))
             Editor.selectedHandle = {transform:transform, dirX:dirX, dirY:dirY, transformScale:transform.scale, transformPosition:transform.position}
     }
 
     IsOver(pos){
         for(var e of Editor.selected){
-            if(RectCollision(e.Transform2D.position, e.Transform2D.scale, pos, Vector2(0,0)))
+            if(Library.RectCollision(e.Transform2D.position, e.Transform2D.scale, pos, Vector2(0,0)))
                 return true;
         }
         return false;
@@ -65,7 +65,7 @@ component Transform2D{
             Editor.selected = [];
             for(var i=entities.length-1;i>=0;i--){
                 var e = entities[i];
-                if(RectCollision(e.Transform2D.position, e.Transform2D.scale, pos, Vector2(0,0))){
+                if(Library.RectCollision(e.Transform2D.position, e.Transform2D.scale, pos, Vector2(0,0))){
                     Editor.selected.push(e);
                 }
             }
@@ -134,18 +134,18 @@ component Player{
     grounded=false;
 
     Update(){
-        var player = GetEntityWithComponent('Player');
+        var player = Entity.WithComponent('Player');
         if(player==undefined)
             return;
         var moveX = 0;
-        if(GetKey('ArrowRight'))
+        if(Core.GetKey('ArrowRight'))
             moveX+=player.Player.moveSpeed;
-        if(GetKey('ArrowLeft'))
+        if(Core.GetKey('ArrowLeft'))
             moveX-=player.Player.moveSpeed;
         RectCollider.Move(player.Transform2D, moveX, 0);
 
         player.Player.velocityY+=player.Player.gravity;
-        if(GetKey('ArrowUp') && player.Player.grounded){
+        if(Core.GetKey('ArrowUp') && player.Player.grounded){
             player.Player.velocityY-=player.Player.jumpSpeed;
             player.Player.grounded=false;
         }
@@ -164,7 +164,7 @@ component RectCollider{
         var pos = Vector2(transform.position.x+deltaX, transform.position.y+deltaY);
         for(var e of entities){
             if(e.RectCollider!=undefined){
-                if(RectCollision(pos, transform.scale, e.Transform2D.position, e.Transform2D.scale)){
+                if(Library.RectCollision(pos, transform.scale, e.Transform2D.position, e.Transform2D.scale)){
                     return true;
                 }
             }
@@ -174,125 +174,103 @@ component RectCollider{
     }
 }
 
-RemoveFromArray(array, item){
-    const index = array.indexOf(item);
-    if (index > -1)
-        array.splice(index, 1);
-}
-
-CreateButton(parent, name, onclick){
-    var button = document.createElement('button');
-    parent.appendChild(button);
-    button.innerHTML = name;
-    button.onclick = onclick
-    return button;
-}
-
-CreateDivButton(parent, name, onclick){
-    var div = CreateDiv(parent);
-    var button = CreateButton(div, name, onclick);
-    return button;
-}
-
-CreateDiv(parent){
-    var div = document.createElement('div');
-    parent.appendChild(div);
-    return div;
-}
-
-GetContext(parent){
-    var div= CreateDiv(parent);
-    var canvas = document.createElement('canvas');
-    div.appendChild(canvas)
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    parent.style.border = '0';
-    parent.style.margin = '0';
-    parent.style.overflow = 'hidden';
-    return canvas.getContext('2d');
-}
-
-CreateMenuItemButton(div, name, onclick){
-    CreateDivButton(div, name, ()=>{
-        onclick();
-        document.body.removeChild(div);
-    });
-}
-
-CreateMenu(position, menuItems){
-    var div = CreateDiv(document.body);
-    div.style.position = 'absolute';
-    div.style.left = position.x+'px';
-    div.style.top = position.y+'px';
-    for(var i of menuItems){
-        CreateMenuItemButton(div, i.name, i.onclick);
+module Library{
+    Button(parent, name, onclick){
+        var button = document.createElement('button');
+        parent.appendChild(button);
+        button.innerHTML = name;
+        button.onclick = onclick
+        return button;
     }
-}
 
-FindPos(obj){
-    var curleft = 0;
-    var curtop = 0;
+    Div(parent){
+        var div = document.createElement('div');
+        parent.appendChild(div);
+        return div;
+    }
     
-    if (obj.offsetParent) {
-        do {
-            curleft += obj.offsetLeft;
-            curtop += obj.offsetTop;
-        } while (obj = obj.offsetParent);
+    DivButton(parent, name, onclick){
+        var div = Div(parent);
+        var button = Button(div, name, onclick);
+        return button;
+    }
+
+    GetContext(parent){
+        var div= Div(parent);
+        var canvas = document.createElement('canvas');
+        div.appendChild(canvas)
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        parent.style.border = '0';
+        parent.style.margin = '0';
+        parent.style.overflow = 'hidden';
+        return canvas.getContext('2d');
+    }
     
-        return Vector2(curleft, curtop);
+    RemoveFromArray(array, item){
+        const index = array.indexOf(item);
+        if (index > -1)
+            array.splice(index, 1);
     }
-}
 
-MenuItem(name, onclick){
-    return {name:name, onclick:onclick};
-}
-
-CreateMenuButton(parent, name, menuItems){
-    var button = CreateButton(parent, name, ()=>{
-        var pos = FindPos(button);
-        pos.y += button.offsetHeight;
-        CreateMenu(pos, menuItems);
-    });
-}
-
-LoadFile(func) {
-    readFile = function(e) {
-        var file = e.target.files[0];
-        if (!file) {
-            return;
-        }
-        var reader = new FileReader();
-        reader.onload = function(e) {
-            var contents = e.target.result;
-            fileInput.func(contents)
-            document.body.removeChild(fileInput)
-        }
-        reader.readAsText(file)
+    RectCollision(posA, scaleA, posB, scaleB){
+        var distx = Math.abs(posB.x - posA.x);
+        var disty = Math.abs(posB.y - posA.y);
+        var minx = (scaleA.x + scaleB.x)/2;
+        var miny = (scaleA.y + scaleB.y)/2;
+        return distx<minx && disty<miny;
     }
-    var fileInput = document.createElement("input")
-    fileInput.type='file'
-    fileInput.style.display='none'
-    fileInput.onchange=readFile
-    fileInput.func=func
-    document.body.appendChild(fileInput)
-    fileInput.click();
+
+    Clear(r,g,b){
+        var ctx=base.ctx;
+        ctx.fillStyle = Color(r,g,b);
+        ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+    }    
 }
 
-SaveFile(name, data){
-    const file = new File([data], name, {
-        type: 'text/plain',
-    });
+module Menu{
+    ItemButton(div, name, onclick){
+        Library.DivButton(div, name, ()=>{
+            onclick();
+            document.body.removeChild(div);
+        });
+    }
+
+    Dropdown(position, menuItems){
+        var div = Library.Div(document.body);
+        div.style.position = 'absolute';
+        div.style.left = position.x+'px';
+        div.style.top = position.y+'px';
+        for(var i of menuItems){
+            ItemButton(div, i.name, i.onclick);
+        }
+    }
+
+    FindPos(obj){
+        var curleft = 0;
+        var curtop = 0;
         
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(file);
-    
-    link.href = url;
-    link.download = file.name;
-    document.body.appendChild(link);
-    link.click();
-    
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+        if (obj.offsetParent) {
+            do {
+                curleft += obj.offsetLeft;
+                curtop += obj.offsetTop;
+            } while (obj = obj.offsetParent);
+        
+            return Vector2(curleft, curtop);
+        }
+    }
+
+    Item(name, onclick){
+        return {name:name, onclick:onclick};
+    }
+
+    Button(parent, name, menuItems){
+        var button = Library.Button(parent, name, ()=>{
+            var pos = FindPos(button);
+            pos.y += button.offsetHeight;
+            Dropdown(pos, menuItems);
+        });
+    }
 }
 
 Color(r,g,b){
@@ -303,142 +281,176 @@ Vector2(x,y){
     return {x:x, y:y};
 }
 
-Entity(components){
-    var entity = {};
-    for(var c of components){
-        entity[c.constructorName] = c;
+module Entity{
+    Create(components){
+        var entity = {};
+        for(var c of components){
+            entity[c.constructorName] = c;
+        }
+        entities.push(entity);
+        return entity;
     }
-    entities.push(entity);
-    return entity;
-}
-
-Clear(r,g,b){
-    var ctx=base.ctx;
-    ctx.fillStyle = Color(r,g,b);
-    ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
-}
-
-RectCollision(posA, scaleA, posB, scaleB){
-    var distx = Math.abs(posB.x - posA.x);
-    var disty = Math.abs(posB.y - posA.y);
-    var minx = (scaleA.x + scaleB.x)/2;
-    var miny = (scaleA.y + scaleB.y)/2;
-    return distx<minx && disty<miny;
-}
-
-CreatePlayer(){
-    var e = Entity([
-        Transform2D.Create(Vector2(base.ctx.canvas.width/2, base.ctx.canvas.height/2), 0, Vector2(30,70)),
-        Rect.Create(Color(1,0,0)),
-        Player.Create(5,10,0.2,0,false),
-    ]);
-    Editor.selected = [e];
-}
-
-CreateRect(){
-    var e = Entity([
-        Transform2D.Create(Vector2(base.ctx.canvas.width/2, base.ctx.canvas.height/2), 0, Vector2(100,100)),
-        Rect.Create(Color(0,0,1)),
-        RectCollider.Create(),
-    ]);
-    Editor.selected = [e];
-}
-
-GetEntityWithComponent(type){
-    for(var e of entities){
-        if(e[type]!=undefined)
-            return e;
+    
+    WithComponent(type){
+        for(var e of entities){
+            if(e[type]!=undefined)
+                return e;
+        }
+        return undefined;
     }
-    return undefined;
+
+    CreatePlayer(){
+        var e = Create([
+            Transform2D.Create(Vector2(base.ctx.canvas.width/2, base.ctx.canvas.height/2), 0, Vector2(30,70)),
+            Rect.Create(Color(1,0,0)),
+            Player.Create(5,10,0.2,0,false),
+        ]);
+        Editor.selected = [e];
+    }
+
+    CreateRect(){
+        var e = Create([
+            Transform2D.Create(Vector2(base.ctx.canvas.width/2, base.ctx.canvas.height/2), 0, Vector2(100,100)),
+            Rect.Create(Color(0,0,1)),
+            RectCollider.Create(),
+        ]);
+        Editor.selected = [e];
+    }
 }
 
-GetMousePos(canvas, e) {
-    var rect = canvas.getBoundingClientRect();
-    return Vector2(e.clientX - rect.left, e.clientY - rect.top);
-}
+module Core{
+    LoadFile(func) {
+        readFile = function(e) {
+            var file = e.target.files[0];
+            if (!file) {
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var contents = e.target.result;
+                fileInput.func(contents)
+                document.body.removeChild(fileInput)
+            }
+            reader.readAsText(file)
+        }
+        var fileInput = document.createElement("input")
+        fileInput.type='file'
+        fileInput.style.display='none'
+        fileInput.onchange=readFile
+        fileInput.func=func
+        document.body.appendChild(fileInput)
+        fileInput.click();
+    }
+    
+    SaveFile(name, data){
+        const file = new File([data], name, {
+            type: 'text/plain',
+        });
+            
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(file);
+        
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    }    
 
-OnMouseDown(e){
-    base.mouseDown = true;
-    var mousePos = GetMousePos(base.ctx.canvas, e);
-    base.startDrag = mousePos;
-    if(base.mode.OnMouseDown) base.mode.OnMouseDown(mousePos);
-    if(base.mode.OnBeginDrag) base.mode.OnBeginDrag(mousePos);
-}
+    GetMousePos(canvas, e) {
+        var rect = canvas.getBoundingClientRect();
+        return Vector2(e.clientX - rect.left, e.clientY - rect.top);
+    }
 
-OnMouseUp(e){   
-    base.mouseDown = false; 
-    var mousePos = GetMousePos(base.ctx.canvas, e);
-    if(base.mode.OnEndDrag) base.mode.OnEndDrag(mousePos);
-}
-
-OnMouseMove(e){
-    if(base.mouseDown){
+    OnMouseDown(e){
+        base.mouseDown = true;
         var mousePos = GetMousePos(base.ctx.canvas, e);
-        if(base.mode.OnDrag) base.mode.OnDrag(base.startDrag, mousePos);
-    }        
-}
-
-GetKey(key){
-    return base.input.keys.has(key);
-}
-
-OnKeyDown(e){
-    base.input.keys.add(e.key);
-    if(base.mode.OnKeyDown) base.mode.OnKeyDown(e);
-}
-
-OnKeyUp(e){
-    if(base.mode.OnKeyUp) base.mode.OnKeyUp(e);
-    base.input.keys.delete(e.key);
-}
-
-Update(){
-    if(base.mode.Update) base.mode.Update();
-    requestAnimationFrame(Update);
-}
-
-RunButton(){
-    if(base.mode == Editor){
-        base.runButton.innerHTML = 'x';
-        base.mode = Game;
-        base.saveData = JSON.stringify(entities);
+        base.startDrag = mousePos;
+        if(base.mode.OnMouseDown) base.mode.OnMouseDown(mousePos);
+        if(base.mode.OnBeginDrag) base.mode.OnBeginDrag(mousePos);
     }
-    else{
-        base.runButton.innerHTML = '>';
+
+    OnMouseUp(e){   
+        base.mouseDown = false; 
+        var mousePos = GetMousePos(base.ctx.canvas, e);
+        if(base.mode.OnEndDrag) base.mode.OnEndDrag(mousePos);
+    }
+
+    OnMouseMove(e){
+        if(base.mouseDown){
+            var mousePos = GetMousePos(base.ctx.canvas, e);
+            if(base.mode.OnDrag) base.mode.OnDrag(base.startDrag, mousePos);
+        }        
+    }
+
+    GetKey(key){
+        return base.input.keys.has(key);
+    }
+
+    OnKeyDown(e){
+        base.input.keys.add(e.key);
+        if(base.mode.OnKeyDown) base.mode.OnKeyDown(e);
+    }
+
+    OnKeyUp(e){
+        if(base.mode.OnKeyUp) base.mode.OnKeyUp(e);
+        base.input.keys.delete(e.key);
+    }
+
+    Update(){
+        if(base.mode.Update) base.mode.Update();
+        requestAnimationFrame(Update);
+    }
+
+    RunButton(){
+        if(base.mode == Editor){
+            base.runButton.innerHTML = 'x';
+            base.mode = Game;
+            base.saveData = JSON.stringify(entities);
+        }
+        else{
+            base.runButton.innerHTML = '>';
+            base.mode = Editor;
+            entities = JSON.parse(base.saveData);
+        }
+    }
+
+    Save(){
+        SaveFile('jtsave.txt', JSON.stringify(entities));
+    }
+
+    Load(){
+        LoadFile(c=>{entities = JSON.parse(c);});
+    }
+
+    Clear(){
+        entities = [];
+    }
+
+    Awake(){
+        base.menu = Library.Div(document.body);
+        Menu.Button(base.menu, 'File', [Menu.Item('Load',Load), Menu.Item('Save',Save), Menu.Item('Clear', Clear)]);
+        Menu.Button(base.menu, 'Add', [Menu.Item('Rect', Entity.CreateRect), Menu.Item('Player', Entity.CreatePlayer)])
+        base.runButton = Library.Button(base.menu, '>', RunButton);
+        base.ctx = Library.GetContext(document.body);
+        addEventListener('keydown', OnKeyDown);
+        addEventListener('keyup', OnKeyUp);
+        addEventListener('mousedown', OnMouseDown);
+        addEventListener('mousemove', OnMouseMove);
+        addEventListener('mouseup', OnMouseUp);
+
         base.mode = Editor;
-        entities = JSON.parse(base.saveData);
+        base.input = {};
+        base.input.keys = new Set();
+        Editor.selected = [];
+        Update();
     }
-}
-
-Save(){
-    SaveFile('jtsave.txt', JSON.stringify(entities));
-}
-
-Load(){
-    LoadFile(c=>{entities = JSON.parse(c);});
-}
-
-ClearEntities(){
-    entities = [];
 }
 
 Awake(){
-    base.menu = CreateDiv(document.body);
-    CreateMenuButton(base.menu, 'File', [MenuItem('Load',Load), MenuItem('Save',Save), MenuItem('Clear', ClearEntities)]);
-    CreateMenuButton(base.menu, 'Add', [MenuItem('Rect', CreateRect), MenuItem('Player', CreatePlayer)])
-    base.runButton = CreateButton(base.menu, '>', RunButton);
-    base.ctx = GetContext(document.body);
-    addEventListener('keydown', OnKeyDown);
-    addEventListener('keyup', OnKeyUp);
-    addEventListener('mousedown', OnMouseDown);
-    addEventListener('mousemove', OnMouseMove);
-    addEventListener('mouseup', OnMouseUp);
-
-    base.mode = Editor;
-    base.input = {};
-    base.input.keys = new Set();
-    Editor.selected = [];
-    Update();
+    Core.Awake();
 }
 
 module Editor{
@@ -479,7 +491,7 @@ module Editor{
     }
 
     Update(){
-        Clear(0,0,0);
+        Library.Clear(0,0,0);
         Rect.Draw();
         Transform2D.Draw();
     }
@@ -487,7 +499,7 @@ module Editor{
 
 module Game{
     Update(){
-        Clear(0,0,0);
+        Library.Clear(0,0,0);
         Player.Update();
         Rect.Draw();
     }
