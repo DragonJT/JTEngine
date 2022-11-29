@@ -67,6 +67,7 @@ component Transform2D{
                 var e = entities[i];
                 if(Library.RectCollision(e.Transform2D.position, e.Transform2D.scale, pos, Vector2(0,0))){
                     Editor.selected.push(e);
+                    return;
                 }
             }
         }
