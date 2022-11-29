@@ -32,7 +32,6 @@ function Emit(parsed){
 
     var code = '';
     code+=`
-var base = {};
 var entities = [];
 `;
     for(var f of functions)

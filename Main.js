@@ -10,7 +10,7 @@ component Transform2D{
     DrawHandle(transform, dirX, dirY, radius){
         var x = transform.position.x - transform.scale.x/2*dirX;
         var y = transform.position.y - transform.scale.y/2*dirY;
-        var ctx = base.ctx;
+        var ctx = Core.ctx;
         ctx.fillStyle = Color(1,0.5,0);
         if(Editor.selectedHandle!=undefined && Editor.selectedHandle.transform == transform && Editor.selectedHandle.dirX == dirX && Editor.selectedHandle.dirY == dirY)
             ctx.fillStyle = 'blue';
@@ -21,7 +21,7 @@ component Transform2D{
     }
 
     Draw(){
-        var ctx = base.ctx;
+        var ctx = Core.ctx;
         for(var e of Editor.selected){
             ctx.strokeStyle = Color(1,0.5,0);
             ctx.lineWidth = 2;
@@ -114,7 +114,7 @@ component Rect{
     color = Color(0,0,1);
 
     Draw(){
-        var ctx = base.ctx;
+        var ctx = Core.ctx;
         for(var e of entities){
             if(e.Rect!=undefined){
                 var pos = e.Transform2D.position;
@@ -222,7 +222,7 @@ module Library{
     }
 
     Clear(r,g,b){
-        var ctx=base.ctx;
+        var ctx=Core.ctx;
         ctx.fillStyle = Color(r,g,b);
         ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
     }    
@@ -301,7 +301,7 @@ module Entity{
 
     CreatePlayer(){
         var e = Create([
-            Transform2D.Create(Vector2(base.ctx.canvas.width/2, base.ctx.canvas.height/2), 0, Vector2(30,70)),
+            Transform2D.Create(Vector2(Core.ctx.canvas.width/2, Core.ctx.canvas.height/2), 0, Vector2(30,70)),
             Rect.Create(Color(1,0,0)),
             Player.Create(5,10,0.2,0,false),
         ]);
@@ -310,7 +310,7 @@ module Entity{
 
     CreateRect(){
         var e = Create([
-            Transform2D.Create(Vector2(base.ctx.canvas.width/2, base.ctx.canvas.height/2), 0, Vector2(100,100)),
+            Transform2D.Create(Vector2(Core.ctx.canvas.width/2, Core.ctx.canvas.height/2), 0, Vector2(100,100)),
             Rect.Create(Color(0,0,1)),
             RectCollider.Create(),
         ]);
@@ -365,55 +365,55 @@ module Core{
     }
 
     OnMouseDown(e){
-        base.mouseDown = true;
-        var mousePos = GetMousePos(base.ctx.canvas, e);
-        base.startDrag = mousePos;
-        if(base.mode.OnMouseDown) base.mode.OnMouseDown(mousePos);
-        if(base.mode.OnBeginDrag) base.mode.OnBeginDrag(mousePos);
+        Core.mouseDown = true;
+        var mousePos = GetMousePos(Core.ctx.canvas, e);
+        Core.startDrag = mousePos;
+        if(Core.mode.OnMouseDown) Core.mode.OnMouseDown(mousePos);
+        if(Core.mode.OnBeginDrag) Core.mode.OnBeginDrag(mousePos);
     }
 
     OnMouseUp(e){   
-        base.mouseDown = false; 
-        var mousePos = GetMousePos(base.ctx.canvas, e);
-        if(base.mode.OnEndDrag) base.mode.OnEndDrag(mousePos);
+        Core.mouseDown = false; 
+        var mousePos = GetMousePos(Core.ctx.canvas, e);
+        if(Core.mode.OnEndDrag) Core.mode.OnEndDrag(mousePos);
     }
 
     OnMouseMove(e){
-        if(base.mouseDown){
-            var mousePos = GetMousePos(base.ctx.canvas, e);
-            if(base.mode.OnDrag) base.mode.OnDrag(base.startDrag, mousePos);
+        if(Core.mouseDown){
+            var mousePos = GetMousePos(Core.ctx.canvas, e);
+            if(Core.mode.OnDrag) Core.mode.OnDrag(Core.startDrag, mousePos);
         }        
     }
 
     GetKey(key){
-        return base.input.keys.has(key);
+        return Core.input.keys.has(key);
     }
 
     OnKeyDown(e){
-        base.input.keys.add(e.key);
-        if(base.mode.OnKeyDown) base.mode.OnKeyDown(e);
+        Core.input.keys.add(e.key);
+        if(Core.mode.OnKeyDown) Core.mode.OnKeyDown(e);
     }
 
     OnKeyUp(e){
-        if(base.mode.OnKeyUp) base.mode.OnKeyUp(e);
-        base.input.keys.delete(e.key);
+        if(Core.mode.OnKeyUp) Core.mode.OnKeyUp(e);
+        Core.input.keys.delete(e.key);
     }
 
     Update(){
-        if(base.mode.Update) base.mode.Update();
+        if(Core.mode.Update) Core.mode.Update();
         requestAnimationFrame(Update);
     }
 
     RunButton(){
-        if(base.mode == Editor){
-            base.runButton.innerHTML = 'x';
-            base.mode = Game;
-            base.saveData = JSON.stringify(entities);
+        if(Core.mode == Editor){
+            Core.runButton.innerHTML = 'x';
+            Core.mode = Game;
+            Core.saveData = JSON.stringify(entities);
         }
         else{
-            base.runButton.innerHTML = '>';
-            base.mode = Editor;
-            entities = JSON.parse(base.saveData);
+            Core.runButton.innerHTML = '>';
+            Core.mode = Editor;
+            entities = JSON.parse(Core.saveData);
         }
     }
 
@@ -430,20 +430,20 @@ module Core{
     }
 
     Awake(){
-        base.menu = Library.Div(document.body);
-        Menu.Button(base.menu, 'File', [Menu.Item('Load',Load), Menu.Item('Save',Save), Menu.Item('Clear', Clear)]);
-        Menu.Button(base.menu, 'Add', [Menu.Item('Rect', Entity.CreateRect), Menu.Item('Player', Entity.CreatePlayer)])
-        base.runButton = Library.Button(base.menu, '>', RunButton);
-        base.ctx = Library.GetContext(document.body);
+        Core.menu = Library.Div(document.body);
+        Menu.Button(Core.menu, 'File', [Menu.Item('Load',Load), Menu.Item('Save',Save), Menu.Item('Clear', Clear)]);
+        Menu.Button(Core.menu, 'Add', [Menu.Item('Rect', Entity.CreateRect), Menu.Item('Player', Entity.CreatePlayer)])
+        Core.runButton = Library.Button(Core.menu, '>', RunButton);
+        Core.ctx = Library.GetContext(document.body);
         addEventListener('keydown', OnKeyDown);
         addEventListener('keyup', OnKeyUp);
         addEventListener('mousedown', OnMouseDown);
         addEventListener('mousemove', OnMouseMove);
         addEventListener('mouseup', OnMouseUp);
 
-        base.mode = Editor;
-        base.input = {};
-        base.input.keys = new Set();
+        Core.mode = Editor;
+        Core.input = {};
+        Core.input.keys = new Set();
         Editor.selected = [];
         Update();
     }
