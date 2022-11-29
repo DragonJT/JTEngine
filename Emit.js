@@ -2,18 +2,32 @@
 function Emit(parsed){
     var components = parsed.filter(p=>p.constructorName == 'Component'); 
     var functions = parsed.filter(p=>p.constructorName == 'Function');
-    var modes = parsed.filter(p=>p.constructorName == 'Mode');
+    var modules = parsed.filter(p=>p.constructorName == 'Module');
     
-    function Function(f){
-        code+='function '+f.name.value+'(';
+    function Args(f){
+        code+='(';
         for(var i=0;i<f.args.length;i++){
             code+=f.args[i].value;
             if(i<f.args.length-1)
                 code+=',';
         }
         code+=')\n';
+    }
+
+    function Function(f){
+        code+='function '+f.name.value;
+        Args(f);
         code+=f.body;
         code+='\n';
+    }
+
+    function Functions(funcs){
+        for(var f of funcs){
+            code+='function '+f.name.value;
+            Args(f);
+            code+=f.body;
+            code+='\n';
+        }
     }
 
     var code = '';
@@ -24,47 +38,42 @@ var entities = [];
     for(var f of functions)
         Function(f);
     for(var c of components){
-        code+='function '+c.name.value+'('
-        for(var i=0;i<c.body.length;i++){
-            code+=c.body[i].name.value;
-            if(i<c.body.length-1)
+        var fields = c.body.filter(b=>b.constructorName == 'Field');
+        var funcs = c.body.filter(f=>f.constructorName == 'Function');
+        code+='var '+c.name.value+'=function(){\n';
+        code+='function Create('
+        for(var i=0;i<fields.length;i++){
+            code+=fields[i].name.value;
+            if(i<fields.length-1)
                 code+=',';
         }
         code+='){\n';
-        code+='var o={}\n';
-        code+='o.constructorName='+'"'+c.name.value+'";\n';
-        for(var p of c.body){
-            code+='o.'+p.name.value+'='+p.name.value+';\n';
+        code+='return {\n';
+        code+='constructorName:'+'"'+c.name.value+'",\n';
+        for(var f of fields){
+            code+=f.name.value+':'+f.name.value+',\n';
         }
-        code+='return o;\n';
+        code+='};\n';
         code+='}\n';
+        Functions(funcs);
+
+        code+='return {\n'
+        code+='Create:Create,\n';
+        for(var f of funcs){
+            code+=f.name.value+':'+f.name.value+',\n';
+        }
+        code+='}}();\n';
     }
 
-    function Mode(mode){
-        var modeName = mode.name.value;
-        code+='function '+modeName+'(){\n'
-        code+='var '+modeName+'={};\n';
-        for(var b of mode.body){
-            if(b.constructorName == 'Function')
-                Function(b);
-            else if(b.constructorName == 'Mode')
-                Mode(b);
+    for(var m of modules){
+        var funcs = m.body.filter(f=>f.constructorName == 'Function');
+        code+='var '+m.name.value+'=function(){\n';
+        Functions(funcs);
+        code+='return {\n';
+        for(var f of funcs){
+            code+=f.name.value+':'+f.name.value+',\n';
         }
-        for(var b of mode.body){
-            if(b.constructorName == 'Function')
-                code+=modeName+'.'+b.name.value+'='+b.name.value+';\n';
-            else if(b.constructorName == 'Mode')
-                code+=modeName+'.'+b.name.value+'='+b.name.value+'();\n';
-        }
-        var awakeFunc = mode.body.find(b=>b.constructorName == 'Function' && b.name.value == 'Awake');
-        if(awakeFunc!=undefined)
-            code+='Awake();\n';
-        code+='return '+modeName+';\n';
-        code+='}\n';
-    }
-    for(var mode of modes){
-        Mode(mode);
-        code+='base.'+mode.name.value+'='+mode.name.value+'();\n';
+        code+='}}();\n';
     }
     code+=`
 Awake();
