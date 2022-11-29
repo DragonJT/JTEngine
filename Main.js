@@ -476,8 +476,9 @@ mode Game{
             player.Player.grounded=false;
         }
         player.Player.grounded=false;
-        if(Move(player.Transform2D, 0, player.Player.velocityY) && player.Player.velocityY>0){
-            player.Player.grounded=true;
+        if(Move(player.Transform2D, 0, player.Player.velocityY)){
+            if(player.Player.velocityY>0)
+                player.Player.grounded=true;
             player.Player.velocityY=0;
         }
     }
