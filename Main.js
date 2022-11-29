@@ -2,298 +2,294 @@
 
 var code = `
 
-Components{
-    Transform2D{
-        position = Vector2(0,0);
-        angle = 0;
-        scale = Vector2(20,20);
-    }
-
-    Rect{
-        color = Color(0,0,1);
-    }
-
-    Player{
-        moveSpeed = 5;
-        jumpSpeed = 10;
-        gravity = 0.2;
-        velocityY = 0;
-        grounded=false;
-    }
-
-    RectCollider{}
+component Transform2D{
+    position = Vector2(0,0);
+    angle = 0;
+    scale = Vector2(20,20);
 }
 
-Library{
-    RemoveFromArray(array, item){
-        const index = array.indexOf(item);
-        if (index > -1)
-            array.splice(index, 1);
-    }
+component Rect{
+    color = Color(0,0,1);
+}
 
-    CreateButton(parent, name, onclick){
-        var button = document.createElement('button');
-        parent.appendChild(button);
-        button.innerHTML = name;
-        button.onclick = onclick
-        return button;
-    }
+component Player{
+    moveSpeed = 5;
+    jumpSpeed = 10;
+    gravity = 0.2;
+    velocityY = 0;
+    grounded=false;
+}
 
-    CreateDivButton(parent, name, onclick){
-        var div = CreateDiv(parent);
-        var button = CreateButton(div, name, onclick);
-        return button;
-    }
+component RectCollider{}
 
-    CreateDiv(parent){
-        var div = document.createElement('div');
-        parent.appendChild(div);
-        return div;
-    }
+RemoveFromArray(array, item){
+    const index = array.indexOf(item);
+    if (index > -1)
+        array.splice(index, 1);
+}
 
-    GetContext(parent){
-        var div= CreateDiv(parent);
-        var canvas = document.createElement('canvas');
-        div.appendChild(canvas)
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        parent.style.border = '0';
-        parent.style.margin = '0';
-        parent.style.overflow = 'hidden';
-        return canvas.getContext('2d');
-    }
+CreateButton(parent, name, onclick){
+    var button = document.createElement('button');
+    parent.appendChild(button);
+    button.innerHTML = name;
+    button.onclick = onclick
+    return button;
+}
 
-    CreateMenuItemButton(div, name, onclick){
-        CreateDivButton(div, name, ()=>{
-            onclick();
-            document.body.removeChild(div);
-        });
-    }
+CreateDivButton(parent, name, onclick){
+    var div = CreateDiv(parent);
+    var button = CreateButton(div, name, onclick);
+    return button;
+}
 
-    CreateMenu(position, menuItems){
-        var div = CreateDiv(document.body);
-        div.style.position = 'absolute';
-        div.style.left = position.x+'px';
-        div.style.top = position.y+'px';
-        for(var i of menuItems){
-            CreateMenuItemButton(div, i.name, i.onclick);
+CreateDiv(parent){
+    var div = document.createElement('div');
+    parent.appendChild(div);
+    return div;
+}
+
+GetContext(parent){
+    var div= CreateDiv(parent);
+    var canvas = document.createElement('canvas');
+    div.appendChild(canvas)
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    parent.style.border = '0';
+    parent.style.margin = '0';
+    parent.style.overflow = 'hidden';
+    return canvas.getContext('2d');
+}
+
+CreateMenuItemButton(div, name, onclick){
+    CreateDivButton(div, name, ()=>{
+        onclick();
+        document.body.removeChild(div);
+    });
+}
+
+CreateMenu(position, menuItems){
+    var div = CreateDiv(document.body);
+    div.style.position = 'absolute';
+    div.style.left = position.x+'px';
+    div.style.top = position.y+'px';
+    for(var i of menuItems){
+        CreateMenuItemButton(div, i.name, i.onclick);
+    }
+}
+
+FindPos(obj){
+    var curleft = 0;
+    var curtop = 0;
+    
+    if (obj.offsetParent) {
+        do {
+            curleft += obj.offsetLeft;
+            curtop += obj.offsetTop;
+        } while (obj = obj.offsetParent);
+    
+        return Vector2(curleft, curtop);
+    }
+}
+
+MenuItem(name, onclick){
+    return {name:name, onclick:onclick};
+}
+
+CreateMenuButton(parent, name, menuItems){
+    var button = CreateButton(parent, name, ()=>{
+        var pos = FindPos(button);
+        pos.y += button.offsetHeight;
+        CreateMenu(pos, menuItems);
+    });
+}
+
+LoadFile(func) {
+    readFile = function(e) {
+        var file = e.target.files[0];
+        if (!file) {
+            return;
         }
-    }
-
-    FindPos(obj){
-        var curleft = 0;
-        var curtop = 0;
-     
-        if (obj.offsetParent) {
-           do {
-              curleft += obj.offsetLeft;
-              curtop += obj.offsetTop;
-           } while (obj = obj.offsetParent);
-     
-           return Vector2(curleft, curtop);
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var contents = e.target.result;
+            fileInput.func(contents)
+            document.body.removeChild(fileInput)
         }
+        reader.readAsText(file)
     }
+    var fileInput = document.createElement("input")
+    fileInput.type='file'
+    fileInput.style.display='none'
+    fileInput.onchange=readFile
+    fileInput.func=func
+    document.body.appendChild(fileInput)
+    fileInput.click();
+}
 
-    MenuItem(name, onclick){
-        return {name:name, onclick:onclick};
-    }
-
-    CreateMenuButton(parent, name, menuItems){
-        var button = CreateButton(parent, name, ()=>{
-            var pos = FindPos(button);
-            pos.y += button.offsetHeight;
-            CreateMenu(pos, menuItems);
-        });
-    }
-
-    LoadFile(func) {
-        readFile = function(e) {
-            var file = e.target.files[0];
-            if (!file) {
-                return;
-            }
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                var contents = e.target.result;
-                fileInput.func(contents)
-                document.body.removeChild(fileInput)
-            }
-            reader.readAsText(file)
-        }
-        var fileInput = document.createElement("input")
-        fileInput.type='file'
-        fileInput.style.display='none'
-        fileInput.onchange=readFile
-        fileInput.func=func
-        document.body.appendChild(fileInput)
-        fileInput.click();
-    }
-
-    SaveFile(name, data){
-        const file = new File([data], name, {
-            type: 'text/plain',
-        });
-          
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(file);
+SaveFile(name, data){
+    const file = new File([data], name, {
+        type: 'text/plain',
+    });
         
-        link.href = url;
-        link.download = file.name;
-        document.body.appendChild(link);
-        link.click();
-        
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-    }
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(file);
     
-    Color(r,g,b){
-        return 'rgb('+r*255+','+g*255+','+b*255+')';
-    }
+    link.href = url;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
     
-    Vector2(x,y){
-        return {x:x, y:y};
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+}
+
+Color(r,g,b){
+    return 'rgb('+r*255+','+g*255+','+b*255+')';
+}
+
+Vector2(x,y){
+    return {x:x, y:y};
+}
+
+Entity(components){
+    var entity = {};
+    for(var c of components){
+        entity[c.constructorName] = c;
     }
-    
-    Entity(components){
-        var entity = {};
-        for(var c of components){
-            entity[c.constructorName] = c;
+    entities.push(entity);
+    return entity;
+}
+
+Clear(r,g,b){
+    var ctx=base.ctx;
+    ctx.fillStyle = Color(r,g,b);
+    ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+}
+
+RectCollision(posA, scaleA, posB, scaleB){
+    var distx = Math.abs(posB.x - posA.x);
+    var disty = Math.abs(posB.y - posA.y);
+    var minx = (scaleA.x + scaleB.x)/2;
+    var miny = (scaleA.y + scaleB.y)/2;
+    return distx<minx && disty<miny;
+}
+
+DrawRects(){
+    var ctx = base.ctx;
+    for(var e of entities){
+        if(e.Rect!=undefined){
+            var pos = e.Transform2D.position;
+            var scale = e.Transform2D.scale;
+            ctx.fillStyle = e.Rect.color;
+            ctx.fillRect(pos.x - scale.x/2, pos.y - scale.y/2, scale.x, scale.y);
         }
-        entities.push(entity);
-        return entity;
     }
+}
 
-    Clear(r,g,b){
-        var ctx=base.ctx;
-        ctx.fillStyle = Color(r,g,b);
-        ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
-    }
+CreateRect(){
+    CallModeFunction(base, 'CreateRect', []);
+}
 
-    RectCollision(posA, scaleA, posB, scaleB){
-        var distx = Math.abs(posB.x - posA.x);
-        var disty = Math.abs(posB.y - posA.y);
-        var minx = (scaleA.x + scaleB.x)/2;
-        var miny = (scaleA.y + scaleB.y)/2;
-        return distx<minx && disty<miny;
-    }
+CreatePlayer(){
+    CallModeFunction(base, 'CreatePlayer', []);
+}
 
-    DrawRects(){
-        var ctx = base.ctx;
-        for(var e of entities){
-            if(e.Rect!=undefined){
-                var pos = e.Transform2D.position;
-                var scale = e.Transform2D.scale;
-                ctx.fillStyle = e.Rect.color;
-                ctx.fillRect(pos.x - scale.x/2, pos.y - scale.y/2, scale.x, scale.y);
-            }
-        }
+GetEntityWithComponent(type){
+    for(var e of entities){
+        if(e[type]!=undefined)
+            return e;
     }
+    return undefined;
+}
 
-    CreateRect(){
-        CallModeFunction(base, 'CreateRect', []);
-    }
+GetMousePos(canvas, e) {
+    var rect = canvas.getBoundingClientRect();
+    return Vector2(e.clientX - rect.left, e.clientY - rect.top);
+}
 
-    CreatePlayer(){
-        CallModeFunction(base, 'CreatePlayer', []);
-    }
+OnMouseDown(e){
+    base.mouseDown = true;
+    var mousePos = GetMousePos(base.ctx.canvas, e);
+    base.startDrag = mousePos;
+    CallModeFunction(base, 'OnMouseDown', [mousePos]);
+    CallModeFunction(base, 'OnBeginDrag', [mousePos]);
+}
 
-    GetEntityWithComponent(type){
-        for(var e of entities){
-            if(e[type]!=undefined)
-                return e;
-        }
-        return undefined;
-    }
+OnMouseUp(e){   
+    base.mouseDown = false; 
+    var mousePos = GetMousePos(base.ctx.canvas, e);
+    CallModeFunction(base, 'OnEndDrag', [mousePos]);    
+}
 
-    GetMousePos(canvas, e) {
-        var rect = canvas.getBoundingClientRect();
-        return Vector2(e.clientX - rect.left, e.clientY - rect.top);
-    }
-    
-    OnMouseDown(e){
-        base.mouseDown = true;
+OnMouseMove(e){
+    if(base.mouseDown){
         var mousePos = GetMousePos(base.ctx.canvas, e);
-        base.startDrag = mousePos;
-        CallModeFunction(base, 'OnMouseDown', [mousePos]);
-        CallModeFunction(base, 'OnBeginDrag', [mousePos]);
+        CallModeFunction(base, 'OnDrag', [base.startDrag, mousePos]);
+    }        
+}
+
+GetKey(key){
+    return base.input.keys.has(key);
+}
+
+OnKeyDown(e){
+    base.input.keys.add(e.key);
+    CallModeFunction(base, 'OnKeyDown', [e]);
+}
+
+OnKeyUp(e){
+    CallModeFunction(base, 'OnKeyUp', [e]);
+    base.input.keys.delete(e.key);
+}
+
+Update(){
+    CallModeFunction(base, 'Update', []);
+    requestAnimationFrame(Update);
+}
+
+RunButton(){
+    if(base.mode == 'Editor'){
+        base.runButton.innerHTML = 'x';
+        base.mode = 'Game';
+        base.saveData = JSON.stringify(entities);
     }
-
-    OnMouseUp(e){   
-        base.mouseDown = false; 
-        var mousePos = GetMousePos(base.ctx.canvas, e);
-        CallModeFunction(base, 'OnEndDrag', [mousePos]);    
-    }
-
-    OnMouseMove(e){
-        if(base.mouseDown){
-            var mousePos = GetMousePos(base.ctx.canvas, e);
-            CallModeFunction(base, 'OnDrag', [base.startDrag, mousePos]);
-        }        
-    }
-
-    GetKey(key){
-        return base.input.keys.has(key);
-    }
-
-    OnKeyDown(e){
-        base.input.keys.add(e.key);
-        CallModeFunction(base, 'OnKeyDown', [e]);
-    }
-
-    OnKeyUp(e){
-        CallModeFunction(base, 'OnKeyUp', [e]);
-        base.input.keys.delete(e.key);
-    }
-
-    Update(){
-        CallModeFunction(base, 'Update', []);
-        requestAnimationFrame(Update);
-    }
-
-    RunButton(){
-        if(base.mode == 'Editor'){
-            base.runButton.innerHTML = 'x';
-            base.mode = 'Game';
-            base.saveData = JSON.stringify(entities);
-        }
-        else{
-            base.runButton.innerHTML = '>';
-            base.mode = 'Editor';
-            entities = JSON.parse(base.saveData);
-        }
-    }
-
-    Save(){
-        SaveFile('jtsave.txt', JSON.stringify(entities));
-    }
-
-    Load(){
-        LoadFile(c=>{entities = JSON.parse(c);});
-    }
-
-    Awake(){
-        base.menu = CreateDiv(document.body);
-        CreateMenuButton(base.menu, 'File', [MenuItem('Load',Load), MenuItem('Save',Save)])
-        CreateMenuButton(base.menu, 'Add', [MenuItem('Rect', CreateRect), MenuItem('Player', CreatePlayer)]);
-        base.runButton = CreateButton(base.menu, '>', RunButton);
-        base.ctx = GetContext(document.body);
-        addEventListener('keydown', OnKeyDown);
-        addEventListener('keyup', OnKeyUp);
-        addEventListener('mousedown', OnMouseDown);
-        addEventListener('mousemove', OnMouseMove);
-        addEventListener('mouseup', OnMouseUp);
-
-        base.input = {};
-        base.input.keys = new Set();
+    else{
+        base.runButton.innerHTML = '>';
         base.mode = 'Editor';
-        Update();
+        entities = JSON.parse(base.saveData);
     }
+}
 
-    CallModeFunction(obj, funcName, params){
-        var func = obj[obj.mode][funcName];
-        if(func!=undefined)
-            func(...params);
-    }
+Save(){
+    SaveFile('jtsave.txt', JSON.stringify(entities));
+}
+
+Load(){
+    LoadFile(c=>{entities = JSON.parse(c);});
+}
+
+Awake(){
+    base.menu = CreateDiv(document.body);
+    CreateMenuButton(base.menu, 'File', [MenuItem('Load',Load), MenuItem('Save',Save)])
+    CreateMenuButton(base.menu, 'Add', [MenuItem('Rect', CreateRect), MenuItem('Player', CreatePlayer)]);
+    base.runButton = CreateButton(base.menu, '>', RunButton);
+    base.ctx = GetContext(document.body);
+    addEventListener('keydown', OnKeyDown);
+    addEventListener('keyup', OnKeyUp);
+    addEventListener('mousedown', OnMouseDown);
+    addEventListener('mousemove', OnMouseMove);
+    addEventListener('mouseup', OnMouseUp);
+
+    base.input = {};
+    base.input.keys = new Set();
+    base.mode = 'Editor';
+    Update();
+}
+
+CallModeFunction(obj, funcName, params){
+    var func = obj[obj.mode][funcName];
+    if(func!=undefined)
+        func(...params);
 }
 
 mode Editor{
@@ -503,7 +499,7 @@ function JSTokenizer(code){
     tokenizer.Add('Number', new TkOr([float, integer]));
     tokenizer.Add('String', new TkOr([new TkQuote('"'), new TkQuote("'"), new TkQuote('`')]));
     tokenizer.Add('Identifier', new TkObject([character, new TkWhile(alphaNumeric, 0)]), true, 
-        new Set(['Components', 'StartupSystems', 'Systems', 'Library', 'mode', 'true', 'false']));
+        new Set(['component', 'mode', 'true', 'false']));
     var tokens = tokenizer.Tokenize(code);
 
     var value = new PsCircular();
@@ -521,12 +517,9 @@ function JSTokenizer(code){
     field.AddLiteral(';');
 
     var component = new PsObject('Component');
+    component.AddLiteral('component');
     component.Add('name', new PsToken('Identifier'));
     component.Add('body', new PsDecoratedValue([new PsToken('{'), new PsWhile(field, 0), new PsToken('}')], 1));
-
-    var components = new PsObject('Components');
-    components.AddLiteral('Components');
-    components.Add('body', new PsDecoratedValue([new PsToken('{'), new PsWhile(component, 0), new PsToken('}')], 1));
 
     var args =  new PsDecoratedValue([new PsToken('('), new PsWhileWithDeliminator(new PsToken('Identifier'), ','), new PsToken(')')], 1);
     var func = new PsObject('Function');
@@ -534,16 +527,12 @@ function JSTokenizer(code){
     func.Add('args', args);
     func.Add('body', new PsBlock('{', '}'));
 
-    var library = new PsObject('Library');
-    library.AddLiteral('Library');
-    library.Add('body', new PsDecoratedValue([new PsToken('{'), new PsWhile(func, 0), new PsToken('}')], 1));
-
     var mode = new PsObject('Mode');
     mode.AddLiteral('mode');
     mode.Add('name', new PsToken('Identifier'));
     mode.Add('body', new PsDecoratedValue([new PsToken('{'), new PsWhile(new PsOr([mode, func]), 0), new PsToken('}')], 1));
 
-    var core = new PsWhile(new PsOr([library, components, mode]), 0);
+    var core = new PsWhile(new PsOr([component, mode, func]), 0);
     var compileUnit = core;
     var reader = new TokenReader(tokens, code);
     var p = compileUnit.Parse(reader);

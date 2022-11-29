@@ -1,7 +1,7 @@
 
 function Emit(parsed){
-    var components = parsed.find(p=>p.constructorName == 'Components').body; 
-    var library = parsed.find(p=>p.constructorName == 'Library').body;
+    var components = parsed.filter(p=>p.constructorName == 'Component'); 
+    var functions = parsed.filter(p=>p.constructorName == 'Function');
     var modes = parsed.filter(p=>p.constructorName == 'Mode');
     
     function Function(f){
@@ -21,7 +21,7 @@ function Emit(parsed){
 var base = {};
 var entities = [];
 `;
-    for(var f of library)
+    for(var f of functions)
         Function(f);
     for(var c of components){
         code+='function '+c.name.value+'('
